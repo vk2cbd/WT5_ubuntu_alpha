@@ -47,11 +47,27 @@ from ri_power import PowerMeterConfig, PowerReading, RtlPowerMeter
 from ri_solar import sun_equatorial, sun_position
 
 
-APP_VERSION = "v0.1-alpha"
+APP_VERSION = "v0.2-alpha"
 
 
 def axis_label(axis: Axis) -> str:
     return "AZ" if axis == Axis.AZIMUTH else "EL"
+
+
+def scan_plot_offset(axis: Axis, row: dict[str, object]) -> float:
+    """Return the angular scan coordinate used for plotting and fitting."""
+    offset = float(row["offset_degrees"])
+    if axis != Axis.AZIMUTH:
+        return offset
+    stored = row.get("cross_elevation_offset_degrees")
+    if stored not in (None, ""):
+        return float(stored)
+    boresight_el = float(row.get("boresight_elevation_degrees", row["nominal_el"]))
+    return offset * math.cos(math.radians(boresight_el))
+
+
+def scan_coordinate_label(axis: Axis) -> str:
+    return "Cross-elevation offset (deg)" if axis == Axis.AZIMUTH else "Elevation offset (deg)"
 
 
 class LimitsDialog(tk.Toplevel):
@@ -2180,7 +2196,7 @@ class ScanCalibrationDialog(tk.Toplevel):
 
         buttons = ttk.Frame(self, padding=(10, 0, 10, 10))
         buttons.grid(row=1, column=0, sticky="ew")
-        ttk.Button(buttons, text="AZ Scan", command=lambda: self.start_scan(Axis.AZIMUTH)).pack(side="left")
+        ttk.Button(buttons, text="AZ Scan (Cross-EL)", command=lambda: self.start_scan(Axis.AZIMUTH)).pack(side="left")
         ttk.Button(buttons, text="EL Scan", command=lambda: self.start_scan(Axis.ELEVATION)).pack(side="left", padx=(6, 0))
         ttk.Button(buttons, text="Stop Scan", command=app.stop_scan).pack(side="left", padx=(6, 0))
         ttk.Button(buttons, text="Close", command=self.close).pack(side="right")
@@ -2232,26 +2248,29 @@ class ScanGraphDialog(tk.Toplevel):
         antenna_name: str,
     ) -> None:
         super().__init__(app)
-        self.title(f"{antenna_name} {axis_label(axis)} Scan")
+        plot_name = "Cross-Elevation" if axis == Axis.AZIMUTH else "Elevation"
+        self.title(f"{antenna_name} {plot_name} Scan")
         self.resizable(False, False)
         body = ttk.Frame(self, padding=10)
         body.grid(row=0, column=0, sticky="nsew")
-        ttk.Label(body, text=f"{antenna_name} {axis_label(axis)} scan saved to {csv_path.name}").grid(
+        ttk.Label(body, text=f"{antenna_name} {plot_name} scan saved to {csv_path.name}").grid(
             row=0, column=0, sticky="w"
         )
+        self.coordinate_var = tk.StringVar(value="")
+        ttk.Label(body, textvariable=self.coordinate_var).grid(row=1, column=0, sticky="w", pady=(4, 0))
         self.summary_var = tk.StringVar(value="Fit --")
         canvas = tk.Canvas(body, width=520, height=300, background="white")
-        canvas.grid(row=1, column=0, pady=(8, 0))
+        canvas.grid(row=2, column=0, pady=(8, 0))
         self.draw_plot(canvas, axis, rows)
-        ttk.Label(body, textvariable=self.summary_var).grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Button(body, text="Close", command=self.destroy).grid(row=3, column=0, sticky="e", pady=(8, 0))
+        ttk.Label(body, textvariable=self.summary_var).grid(row=3, column=0, sticky="w", pady=(8, 0))
+        ttk.Button(body, text="Close", command=self.destroy).grid(row=4, column=0, sticky="e", pady=(8, 0))
 
     def draw_plot(self, canvas: tk.Canvas, axis: Axis, rows: list[dict[str, object]]) -> None:
         width = int(canvas["width"])
         height = int(canvas["height"])
         left, right, top, bottom = 55, width - 20, 20, height - 45
         scan_points = [
-            (float(row["offset_degrees"]), float(row.get("power_value", row["power_dbfs"])))
+            (scan_plot_offset(axis, row), float(row.get("power_value", row["power_dbfs"])))
             for row in rows
             if row.get("power_value", row.get("power_dbfs")) is not None
         ]
@@ -2279,7 +2298,25 @@ class ScanGraphDialog(tk.Toplevel):
         self.draw_graticule(canvas, left, right, top, bottom, min_x, max_x, min_y, max_y)
         canvas.create_line(left, bottom, right, bottom)
         canvas.create_line(left, top, left, bottom)
-        canvas.create_text((left + right) / 2, height - 15, text=f"{axis_label(axis)} offset degrees")
+        canvas.create_text((left + right) / 2, height - 15, text=scan_coordinate_label(axis))
+        if axis == Axis.AZIMUTH:
+            boresight_elevations = [
+                float(row.get("boresight_elevation_degrees", row["nominal_el"]))
+                for row in rows
+                if row.get("power_value", row.get("power_dbfs")) is not None
+            ]
+            mean_boresight_el = sum(boresight_elevations) / len(boresight_elevations)
+            min_boresight_el = min(boresight_elevations)
+            max_boresight_el = max(boresight_elevations)
+            if max_boresight_el - min_boresight_el < 0.05:
+                elevation_text = f"boresight EL {mean_boresight_el:0.2f} deg"
+            else:
+                elevation_text = (
+                    f"point-by-point boresight EL {min_boresight_el:0.2f}..{max_boresight_el:0.2f} deg"
+                )
+            self.coordinate_var.set(f"Cross-EL = commanded AZ offset x cos(boresight EL); {elevation_text}")
+        else:
+            self.coordinate_var.set("Elevation scan coordinate = commanded EL offset")
         power_unit = next((str(row.get("power_unit", "dBFS")) for row in rows if row.get("power_value", row.get("power_dbfs")) is not None), "dBFS")
         canvas.create_text(18, (top + bottom) / 2, text=power_unit, angle=90)
         self.draw_boresight(canvas, left, right, top, bottom, min_x, max_x)
@@ -2292,8 +2329,9 @@ class ScanGraphDialog(tk.Toplevel):
             for start, end in zip(canvas_fit_points, canvas_fit_points[1:]):
                 canvas.create_line(start[0], start[1], end[0], end[1], fill="#d62728", width=2)
             fwhm = 2.35482 * fit["sigma"]
+            fit_coordinate = "cross-EL" if axis == Axis.AZIMUTH else "EL"
             self.summary_var.set(
-                f"Fit centre {fit['center']:+0.3f} deg, FWHM {fwhm:0.3f} deg, "
+                f"Fit {fit_coordinate} centre {fit['center']:+0.3f} deg, FWHM {fwhm:0.3f} deg, "
                 f"peak {fit['peak']:0.2f} {power_unit}, RMS {fit['rms']:0.3f} dB"
             )
         else:
@@ -3242,6 +3280,18 @@ class RIUbuntuAlphaApp(tk.Tk):
             "axis": axis_label(axis),
             "scan_number": scan_number,
             "offset_degrees": offset,
+            "boresight_elevation_degrees": nominal.elevation,
+            "cross_elevation_offset_degrees": (
+                offset * math.cos(math.radians(nominal.elevation))
+                if axis == Axis.AZIMUTH
+                else None
+            ),
+            "plot_offset_degrees": (
+                offset * math.cos(math.radians(nominal.elevation))
+                if axis == Axis.AZIMUTH
+                else offset
+            ),
+            "plot_coordinate": "cross_elevation" if axis == Axis.AZIMUTH else "elevation",
             "nominal_az": nominal.azimuth,
             "nominal_el": nominal.elevation,
             "target_az": target.azimuth,
@@ -3281,6 +3331,16 @@ class RIUbuntuAlphaApp(tk.Tk):
             template["power_calibrated"] = all(bool(row.get("power_calibrated")) for row in matching)
             template["power_extrapolated"] = any(bool(row.get("power_extrapolated")) for row in matching)
             template["sample_count"] = sum(int(row.get("sample_count", 0)) for row in matching)
+            template["boresight_elevation_degrees"] = sum(
+                float(row["boresight_elevation_degrees"]) for row in matching
+            ) / len(matching)
+            if template.get("plot_coordinate") == "cross_elevation":
+                template["cross_elevation_offset_degrees"] = sum(
+                    float(row["cross_elevation_offset_degrees"]) for row in matching
+                ) / len(matching)
+                template["plot_offset_degrees"] = template["cross_elevation_offset_degrees"]
+            else:
+                template["plot_offset_degrees"] = offset
             template["scan_number"] = "avg"
             averaged.append(template)
         return averaged

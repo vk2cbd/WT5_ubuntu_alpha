@@ -241,6 +241,9 @@ Stop reasons should be explicit, for example:
 - Save scan CSV files under `scan/`.
 - Show scan graph with graticule and boresight line.
 - Fit Gaussian plus sloped baseline.
+- Plot and fit azimuth scans in cross-elevation
+  (`AZ offset * cos(boresight elevation)`), deriving boresight elevation from
+  the nominal tracked-source elevation recorded for each scan point.
 - Report peak centre, FWHM, fitted peak, and residual.
 - Continue tracking the selected source while scanning, with only the selected
   antenna offset.

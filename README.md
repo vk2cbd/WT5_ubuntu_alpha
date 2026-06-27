@@ -97,3 +97,17 @@ An existing `WT5.ini` can usually be copied to `ri_ubuntu.ini`; then check:
 - `ri_astro.py` / `ri_solar.py` - source, Sun, and Moon position calculations
 - `ri_logging.py` - JSON-lines event log
 
+## Scan Coordinates
+
+Azimuth scan plots and Gaussian fits use **cross-elevation offset**, not raw
+azimuth-coordinate offset:
+
+```text
+cross-elevation = commanded AZ offset * cos(boresight elevation)
+```
+
+The boresight elevation is recorded from the nominal tracked-source elevation
+at each measurement point. Scan CSV files retain the commanded
+`offset_degrees` and also record `boresight_elevation_degrees`,
+`cross_elevation_offset_degrees`, `plot_offset_degrees`, and
+`plot_coordinate`. Elevation scans continue to use elevation offset directly.
