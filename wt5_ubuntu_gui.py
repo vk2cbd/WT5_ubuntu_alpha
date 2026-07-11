@@ -1,5 +1,5 @@
-﻿#!/usr/bin/env python3
-"""R-I Ubuntu Alpha two-antenna safety/calibration GUI."""
+#!/usr/bin/env python3
+"""WT5 Ubuntu Alpha two-antenna safety/calibration GUI."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 from typing import Callable, Optional
 
-from ri_astro import TargetPosition, local_sidereal_time, moon_equatorial, moon_position, source_position
-from ri_config import (
+from wt5_astro import TargetPosition, local_sidereal_time, moon_equatorial, moon_position, source_position
+from wt5_config import (
     PowerConfig,
     RtlCalibration,
     RTL_CAL_LEVELS_DBM,
@@ -41,10 +41,10 @@ from ri_config import (
     save_sources,
     save_yfactor_config,
 )
-from ri_antenna import AntennaConfig, Axis, Direction, EncoderInfo, Position, SafeAntenna, SafetyError, shortest_angle_delta
-from ri_logging import EventLogger
-from ri_power import PowerMeterConfig, PowerReading, RtlPowerMeter
-from ri_solar import sun_equatorial, sun_position
+from wt5_antenna import AntennaConfig, Axis, Direction, EncoderInfo, Position, SafeAntenna, SafetyError, shortest_angle_delta
+from wt5_logging import EventLogger
+from wt5_power import PowerMeterConfig, PowerReading, RtlPowerMeter
+from wt5_solar import sun_equatorial, sun_position
 
 
 APP_VERSION = "v0.2-alpha"
@@ -54,24 +54,8 @@ def axis_label(axis: Axis) -> str:
     return "AZ" if axis == Axis.AZIMUTH else "EL"
 
 
-def scan_plot_offset(axis: Axis, row: dict[str, object]) -> float:
-    """Return the angular scan coordinate used for plotting and fitting."""
-    offset = float(row["offset_degrees"])
-    if axis != Axis.AZIMUTH:
-        return offset
-    stored = row.get("cross_elevation_offset_degrees")
-    if stored not in (None, ""):
-        return float(stored)
-    boresight_el = float(row.get("boresight_elevation_degrees", row["nominal_el"]))
-    return offset * math.cos(math.radians(boresight_el))
-
-
-def scan_coordinate_label(axis: Axis) -> str:
-    return "Cross-elevation offset (deg)" if axis == Axis.AZIMUTH else "Elevation offset (deg)"
-
-
 class LimitsDialog(tk.Toplevel):
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Antenna Limits")
@@ -240,7 +224,7 @@ class LimitsDialog(tk.Toplevel):
 
 
 class ObserverDialog(tk.Toplevel):
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Observer")
@@ -297,7 +281,7 @@ class ObserverDialog(tk.Toplevel):
 
 
 class SourcesDialog(tk.Toplevel):
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Sources")
@@ -470,7 +454,7 @@ class SourcesDialog(tk.Toplevel):
 
 
 class CalibrationDialog(tk.Toplevel):
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.closed = False
@@ -704,7 +688,7 @@ class CalibrationDialog(tk.Toplevel):
 class PeakCalibrationDialog(tk.Toplevel):
     SOURCE_LABELS = ("Sun", "Moon", "Selected Source")
 
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Peak Calibration")
@@ -1092,7 +1076,7 @@ class EncodersDialog(tk.Toplevel):
         "Mode",
     )
 
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Encoders")
@@ -1189,7 +1173,7 @@ class EncodersDialog(tk.Toplevel):
         if not messagebox.askyesno(
             "Set Encoder Position",
             f"Set {name} {axis_label} Arduino position to {position:0.2f}?\n\n"
-            "This resets the R-I Ubuntu Alpha software calibration offset for this axis to zero.",
+            "This resets the WT5 Ubuntu Alpha software calibration offset for this axis to zero.",
             parent=self,
         ):
             return
@@ -1216,7 +1200,7 @@ class EncodersDialog(tk.Toplevel):
 
 
 class TrackingDialog(tk.Toplevel):
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Tracking")
@@ -1411,7 +1395,7 @@ class TrackingDialog(tk.Toplevel):
 
 
 class AntennaPanel(ttk.Frame):
-    def __init__(self, master: tk.Misc, app: "RIUbuntuAlphaApp", name: str, config: Optional[AntennaConfig] = None) -> None:
+    def __init__(self, master: tk.Misc, app: "WT5UbuntuAlphaApp", name: str, config: Optional[AntennaConfig] = None) -> None:
         super().__init__(master, padding=8)
         self.app = app
         self.name = name
@@ -1637,7 +1621,7 @@ class AntennaPanel(ttk.Frame):
 
 
 class PowerMeterPanel(ttk.LabelFrame):
-    def __init__(self, master: tk.Misc, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, master: tk.Misc, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(master, text="RTL Power Meter", padding=8)
         self.app = app
         self.stop_event = threading.Event()
@@ -1770,7 +1754,7 @@ class PowerMeterPanel(ttk.LabelFrame):
             self.status_var.set(f"Logging {self.log_path.name if self.log_path else ''}".strip())
             return
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        self.log_path = Path(f"ri_power_{timestamp}.csv")
+        self.log_path = Path(f"wt5_power_{timestamp}.csv")
         self.log_handle = self.log_path.open("w", newline="", encoding="utf-8")
         self.log_writer = csv.writer(self.log_handle)
         self.log_writer.writerow(self.log_header())
@@ -2023,7 +2007,7 @@ class PowerMeterPanel(ttk.LabelFrame):
 class RtlCalibrationDialog(tk.Toplevel):
     LEVELS_DBM = RTL_CAL_LEVELS_DBM
 
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("RTL Calibration")
@@ -2162,7 +2146,7 @@ class RtlCalibrationDialog(tk.Toplevel):
 
 
 class ScanCalibrationDialog(tk.Toplevel):
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Scan Calibration")
@@ -2196,7 +2180,7 @@ class ScanCalibrationDialog(tk.Toplevel):
 
         buttons = ttk.Frame(self, padding=(10, 0, 10, 10))
         buttons.grid(row=1, column=0, sticky="ew")
-        ttk.Button(buttons, text="AZ Scan (Cross-EL)", command=lambda: self.start_scan(Axis.AZIMUTH)).pack(side="left")
+        ttk.Button(buttons, text="AZ Scan", command=lambda: self.start_scan(Axis.AZIMUTH)).pack(side="left")
         ttk.Button(buttons, text="EL Scan", command=lambda: self.start_scan(Axis.ELEVATION)).pack(side="left", padx=(6, 0))
         ttk.Button(buttons, text="Stop Scan", command=app.stop_scan).pack(side="left", padx=(6, 0))
         ttk.Button(buttons, text="Close", command=self.close).pack(side="right")
@@ -2241,14 +2225,14 @@ class ScanCalibrationDialog(tk.Toplevel):
 class ScanGraphDialog(tk.Toplevel):
     def __init__(
         self,
-        app: "RIUbuntuAlphaApp",
+        app: "WT5UbuntuAlphaApp",
         axis: Axis,
         rows: list[dict[str, object]],
         csv_path: Path,
         antenna_name: str,
     ) -> None:
         super().__init__(app)
-        plot_name = "Cross-Elevation" if axis == Axis.AZIMUTH else "Elevation"
+        plot_name = axis_label(axis)
         self.title(f"{antenna_name} {plot_name} Scan")
         self.resizable(False, False)
         body = ttk.Frame(self, padding=10)
@@ -2270,7 +2254,7 @@ class ScanGraphDialog(tk.Toplevel):
         height = int(canvas["height"])
         left, right, top, bottom = 55, width - 20, 20, height - 45
         scan_points = [
-            (scan_plot_offset(axis, row), float(row.get("power_value", row["power_dbfs"])))
+            (float(row["offset_degrees"]), float(row.get("power_value", row["power_dbfs"])))
             for row in rows
             if row.get("power_value", row.get("power_dbfs")) is not None
         ]
@@ -2298,25 +2282,8 @@ class ScanGraphDialog(tk.Toplevel):
         self.draw_graticule(canvas, left, right, top, bottom, min_x, max_x, min_y, max_y)
         canvas.create_line(left, bottom, right, bottom)
         canvas.create_line(left, top, left, bottom)
-        canvas.create_text((left + right) / 2, height - 15, text=scan_coordinate_label(axis))
-        if axis == Axis.AZIMUTH:
-            boresight_elevations = [
-                float(row.get("boresight_elevation_degrees", row["nominal_el"]))
-                for row in rows
-                if row.get("power_value", row.get("power_dbfs")) is not None
-            ]
-            mean_boresight_el = sum(boresight_elevations) / len(boresight_elevations)
-            min_boresight_el = min(boresight_elevations)
-            max_boresight_el = max(boresight_elevations)
-            if max_boresight_el - min_boresight_el < 0.05:
-                elevation_text = f"boresight EL {mean_boresight_el:0.2f} deg"
-            else:
-                elevation_text = (
-                    f"point-by-point boresight EL {min_boresight_el:0.2f}..{max_boresight_el:0.2f} deg"
-                )
-            self.coordinate_var.set(f"Cross-EL = commanded AZ offset x cos(boresight EL); {elevation_text}")
-        else:
-            self.coordinate_var.set("Elevation scan coordinate = commanded EL offset")
+        canvas.create_text((left + right) / 2, height - 15, text=f"{axis_label(axis)} offset degrees")
+        self.coordinate_var.set(f"{axis_label(axis)} scan coordinate = commanded {axis_label(axis)} offset")
         power_unit = next((str(row.get("power_unit", "dBFS")) for row in rows if row.get("power_value", row.get("power_dbfs")) is not None), "dBFS")
         canvas.create_text(18, (top + bottom) / 2, text=power_unit, angle=90)
         self.draw_boresight(canvas, left, right, top, bottom, min_x, max_x)
@@ -2329,9 +2296,8 @@ class ScanGraphDialog(tk.Toplevel):
             for start, end in zip(canvas_fit_points, canvas_fit_points[1:]):
                 canvas.create_line(start[0], start[1], end[0], end[1], fill="#d62728", width=2)
             fwhm = 2.35482 * fit["sigma"]
-            fit_coordinate = "cross-EL" if axis == Axis.AZIMUTH else "EL"
             self.summary_var.set(
-                f"Fit {fit_coordinate} centre {fit['center']:+0.3f} deg, FWHM {fwhm:0.3f} deg, "
+                f"Fit {axis_label(axis)} centre {fit['center']:+0.3f} deg, FWHM {fwhm:0.3f} deg, "
                 f"peak {fit['peak']:0.2f} {power_unit}, RMS {fit['rms']:0.3f} dB"
             )
         else:
@@ -2507,7 +2473,7 @@ class ScanGraphDialog(tk.Toplevel):
 
 
 class YFactorDialog(tk.Toplevel):
-    def __init__(self, app: "RIUbuntuAlphaApp") -> None:
+    def __init__(self, app: "WT5UbuntuAlphaApp") -> None:
         super().__init__(app)
         self.app = app
         self.title("Y Factor")
@@ -2624,10 +2590,10 @@ class YFactorDialog(tk.Toplevel):
         self.destroy()
 
 
-class RIUbuntuAlphaApp(tk.Tk):
+class WT5UbuntuAlphaApp(tk.Tk):
     def __init__(self, config_path: str) -> None:
         super().__init__()
-        self.title(f"R-I Ubuntu Alpha Antenna Controller {APP_VERSION}")
+        self.title(f"WT5 Ubuntu Alpha Antenna Controller {APP_VERSION}")
         self.geometry("1100x670")
         self.minsize(1080, 645)
         self.config_path = config_path
@@ -2746,7 +2712,7 @@ class RIUbuntuAlphaApp(tk.Tk):
         self.power_panel.grid(row=1, column=0, columnspan=2, sticky="ew", padx=4, pady=(10, 0))
 
         if not self.configs:
-            self.status_var.set(f"No antennas found in {config_path}. Copy ri_ubuntu.ini.example to ri_ubuntu.ini.")
+            self.status_var.set(f"No antennas found in {config_path}. Copy wt5_ubuntu.ini.example to wt5_ubuntu.ini.")
 
         self.bind_all("<Button>", self.note_user_activity, add="+")
         self.bind_all("<Key>", self.note_user_activity, add="+")
@@ -3180,7 +3146,7 @@ class RIUbuntuAlphaApp(tk.Tk):
         averaged_rows: list[dict[str, object]] = []
         scan_dir = Path(self.config_path).parent / "scan"
         scan_dir.mkdir(parents=True, exist_ok=True)
-        csv_path = scan_dir / f"ri_scan_{config.antenna_name.lower()}_{axis_label(axis).lower()}_{datetime.now():%Y%m%d-%H%M%S}.csv"
+        csv_path = scan_dir / f"wt5_scan_{config.antenna_name.lower()}_{axis_label(axis).lower()}_{datetime.now():%Y%m%d-%H%M%S}.csv"
         try:
             offsets = self.scan_offsets(config)
             total_points = len(offsets) * config.scan_count
@@ -3280,18 +3246,6 @@ class RIUbuntuAlphaApp(tk.Tk):
             "axis": axis_label(axis),
             "scan_number": scan_number,
             "offset_degrees": offset,
-            "boresight_elevation_degrees": nominal.elevation,
-            "cross_elevation_offset_degrees": (
-                offset * math.cos(math.radians(nominal.elevation))
-                if axis == Axis.AZIMUTH
-                else None
-            ),
-            "plot_offset_degrees": (
-                offset * math.cos(math.radians(nominal.elevation))
-                if axis == Axis.AZIMUTH
-                else offset
-            ),
-            "plot_coordinate": "cross_elevation" if axis == Axis.AZIMUTH else "elevation",
             "nominal_az": nominal.azimuth,
             "nominal_el": nominal.elevation,
             "target_az": target.azimuth,
@@ -3331,16 +3285,6 @@ class RIUbuntuAlphaApp(tk.Tk):
             template["power_calibrated"] = all(bool(row.get("power_calibrated")) for row in matching)
             template["power_extrapolated"] = any(bool(row.get("power_extrapolated")) for row in matching)
             template["sample_count"] = sum(int(row.get("sample_count", 0)) for row in matching)
-            template["boresight_elevation_degrees"] = sum(
-                float(row["boresight_elevation_degrees"]) for row in matching
-            ) / len(matching)
-            if template.get("plot_coordinate") == "cross_elevation":
-                template["cross_elevation_offset_degrees"] = sum(
-                    float(row["cross_elevation_offset_degrees"]) for row in matching
-                ) / len(matching)
-                template["plot_offset_degrees"] = template["cross_elevation_offset_degrees"]
-            else:
-                template["plot_offset_degrees"] = offset
             template["scan_number"] = "avg"
             averaged.append(template)
         return averaged
@@ -3467,7 +3411,7 @@ class RIUbuntuAlphaApp(tk.Tk):
         completed_unit = "dB"
         yfactor_dir = Path(self.config_path).parent / "yfactor"
         yfactor_dir.mkdir(parents=True, exist_ok=True)
-        log_path = yfactor_dir / f"ri_yfactor_{antenna_name.lower()}_{datetime.now():%Y%m%d-%H%M%S}.csv"
+        log_path = yfactor_dir / f"wt5_yfactor_{antenna_name.lower()}_{datetime.now():%Y%m%d-%H%M%S}.csv"
         try:
             with log_path.open("w", newline="", encoding="utf-8") as handle:
                 fieldnames = [
@@ -4661,14 +4605,14 @@ class RIUbuntuAlphaApp(tk.Tk):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Launch R-I Ubuntu Alpha two-antenna GUI.")
-    parser.add_argument("--config", default="ri_ubuntu.ini", help="Config file. Default: ri_ubuntu.ini")
+    parser = argparse.ArgumentParser(description="Launch WT5 Ubuntu Alpha two-antenna GUI.")
+    parser.add_argument("--config", default="wt5_ubuntu.ini", help="Config file. Default: wt5_ubuntu.ini")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    app = RIUbuntuAlphaApp(args.config)
+    app = WT5UbuntuAlphaApp(args.config)
     try:
         app.mainloop()
     except KeyboardInterrupt:

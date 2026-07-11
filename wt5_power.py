@@ -1,5 +1,5 @@
-﻿#!/usr/bin/env python3
-"""RTL-SDR power-meter primitives for R-I Ubuntu Alpha."""
+#!/usr/bin/env python3
+"""RTL-SDR power-meter primitives for WT5 Ubuntu Alpha."""
 
 from __future__ import annotations
 

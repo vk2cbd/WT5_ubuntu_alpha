@@ -1,5 +1,5 @@
-﻿#!/usr/bin/env python3
-"""Configuration helpers for R-I Ubuntu Alpha."""
+#!/usr/bin/env python3
+"""Configuration helpers for WT5 Ubuntu Alpha."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
-from ri_antenna import AntennaConfig, Calibration, SafetyLimits
+from wt5_antenna import AntennaConfig, Calibration, SafetyLimits
 
 
 @dataclass

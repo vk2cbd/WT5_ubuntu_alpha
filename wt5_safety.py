@@ -1,14 +1,14 @@
-﻿#!/usr/bin/env python3
-"""Safety primitives for R-I Ubuntu Alpha antenna control.
+#!/usr/bin/env python3
+"""Safety primitives for WT5 Ubuntu Alpha antenna control.
 
-The concrete drive guard logic currently lives in :mod:`ri_antenna` so the
+The concrete drive guard logic currently lives in :mod:`wt5_antenna` so the
 hardware-facing code and the safety checks remain synchronized. This module is
-the public safety facade for new R-I Ubuntu Alpha work.
+the public safety facade for new WT5 Ubuntu Alpha work.
 """
 
 from __future__ import annotations
 
-from ri_antenna import (
+from wt5_antenna import (
     Axis,
     Direction,
     Position,

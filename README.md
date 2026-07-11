@@ -1,4 +1,4 @@
-# R-I Ubuntu Alpha
+# WT5 Ubuntu Alpha
 
 Ubuntu alpha port of the two-antenna radio astronomy controller developed from
 WT5. The code is intended to run on an Ubuntu desktop or small-form-factor PC
@@ -48,21 +48,21 @@ python3 -m pip install -r requirements.txt
 Copy the example config:
 
 ```bash
-cp ri_ubuntu.ini.example ri_ubuntu.ini
+cp wt5_ubuntu.ini.example wt5_ubuntu.ini
 ```
 
-Edit the antenna serial ports in `ri_ubuntu.ini`. On Ubuntu these will usually
+Edit the antenna serial ports in `wt5_ubuntu.ini`. On Ubuntu these will usually
 look like `/dev/ttyUSB0`, `/dev/ttyUSB1`, `/dev/ttyACM0`, or `/dev/ttyACM1`.
 
 Run the GUI:
 
 ```bash
-python3 ri_ubuntu_gui.py --config ri_ubuntu.ini
+python3 wt5_ubuntu_gui.py --config wt5_ubuntu.ini
 ```
 
 ## Migrating From WT5
 
-An existing `WT5.ini` can usually be copied to `ri_ubuntu.ini`; then check:
+An existing `WT5.ini` can usually be copied to `wt5_ubuntu.ini`; then check:
 
 - antenna serial ports
 - observer location
@@ -90,24 +90,9 @@ An existing `WT5.ini` can usually be copied to `ri_ubuntu.ini`; then check:
 
 ## Main Files
 
-- `ri_ubuntu_gui.py` - Tkinter operator interface and orchestration
-- `ri_antenna.py` - Arduino protocol, controller session, and guarded motion
-- `ri_config.py` - `.ini` loading/saving
-- `ri_power.py` - RTL-SDR power meter primitives
-- `ri_astro.py` / `ri_solar.py` - source, Sun, and Moon position calculations
-- `ri_logging.py` - JSON-lines event log
-
-## Scan Coordinates
-
-Azimuth scan plots and Gaussian fits use **cross-elevation offset**, not raw
-azimuth-coordinate offset:
-
-```text
-cross-elevation = commanded AZ offset * cos(boresight elevation)
-```
-
-The boresight elevation is recorded from the nominal tracked-source elevation
-at each measurement point. Scan CSV files retain the commanded
-`offset_degrees` and also record `boresight_elevation_degrees`,
-`cross_elevation_offset_degrees`, `plot_offset_degrees`, and
-`plot_coordinate`. Elevation scans continue to use elevation offset directly.
+- `wt5_ubuntu_gui.py` - Tkinter operator interface and orchestration
+- `wt5_antenna.py` - Arduino protocol, controller session, and guarded motion
+- `wt5_config.py` - `.ini` loading/saving
+- `wt5_power.py` - RTL-SDR power meter primitives
+- `wt5_astro.py` / `wt5_solar.py` - source, Sun, and Moon position calculations
+- `wt5_logging.py` - JSON-lines event log

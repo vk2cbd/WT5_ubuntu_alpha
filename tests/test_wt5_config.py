@@ -1,8 +1,8 @@
-﻿from pathlib import Path
+from pathlib import Path
 import tempfile
 import unittest
 
-from ri_config import load_configs, load_site_config
+from wt5_config import load_configs, load_site_config
 
 
 class ConfigEncodingTests(unittest.TestCase):
@@ -16,7 +16,7 @@ class ConfigEncodingTests(unittest.TestCase):
             "port = /dev/ttyUSB0\n"
         )
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "ri_ubuntu.ini"
+            path = Path(tmp) / "wt5_ubuntu.ini"
             path.write_text(content, encoding="utf-8-sig")
             site = load_site_config(path)
             configs = load_configs(path)

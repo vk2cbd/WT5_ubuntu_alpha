@@ -1,6 +1,6 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
-R-I Ubuntu Alpha hardware driver and safety model.
+WT5 Ubuntu Alpha hardware driver and safety model.
 
 This file contains the decoded WinTrak Arduino protocol plus calibration and
 software-limit helpers used by the GUI.

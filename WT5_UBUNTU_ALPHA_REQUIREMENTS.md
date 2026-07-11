@@ -1,7 +1,7 @@
-﻿# R-I Ubuntu Alpha Requirements
+# WT5 Ubuntu Alpha Requirements
 
-R-I Ubuntu Alpha is a clean rebuild of the WT4 prototype antenna controller. WT4 should remain
-available as the reference implementation and field-tested prototype. R-I Ubuntu Alpha should
+WT5 Ubuntu Alpha is a clean rebuild of the WT4 prototype antenna controller. WT4 should remain
+available as the reference implementation and field-tested prototype. WT5 Ubuntu Alpha should
 reuse the proven protocol knowledge, safety rules, calibration workflows, and
 lessons learned, but should be built with clearer architecture, better
 diagnostics, and a more usable GUI.
@@ -33,19 +33,19 @@ diagnostics, and a more usable GUI.
 
 ## Architectural Requirements
 
-R-I Ubuntu Alpha should be split into clear modules. Suggested structure:
+WT5 Ubuntu Alpha should be split into clear modules. Suggested structure:
 
-- `ri_protocol.py`: serial protocol only.
-- `ri_safety.py`: limits, azimuth dead-zone logic, path choice, safety checks.
-- `ri_antenna.py`: one antenna session, position reads, OLED writes, guarded
+- `wt5_protocol.py`: serial protocol only.
+- `wt5_safety.py`: limits, azimuth dead-zone logic, path choice, safety checks.
+- `wt5_antenna.py`: one antenna session, position reads, OLED writes, guarded
   moves.
-- `ri_tracking.py`: Sun, Moon, and source tracking logic.
-- `ri_power.py`: RTL-SDR power meter and RTL calibration.
-- `ri_calibration.py`: manual calibration, peak calibration, scan calibration,
+- `wt5_tracking.py`: Sun, Moon, and source tracking logic.
+- `wt5_power.py`: RTL-SDR power meter and RTL calibration.
+- `wt5_calibration.py`: manual calibration, peak calibration, scan calibration,
   Gaussian fitting, Y factor.
-- `ri_config.py`: INI configuration load/save and defaults.
-- `ri_logging.py`: event and measurement logging.
-- `ri_gui.py`: GUI presentation and user interaction only.
+- `wt5_config.py`: INI configuration load/save and defaults.
+- `wt5_logging.py`: event and measurement logging.
+- `wt5_gui.py`: GUI presentation and user interaction only.
 - `tests/`: unit and simulation tests.
 
 The GUI should call into service/controller objects rather than containing most
@@ -87,7 +87,7 @@ features.
 
 ### Long Slews
 
-Long slews should not be opaque single calls. R-I Ubuntu Alpha should prefer a segmented
+Long slews should not be opaque single calls. WT5 Ubuntu Alpha should prefer a segmented
 long-slew state machine:
 
 - Break long moves into controlled segments.
@@ -104,7 +104,7 @@ jog timer while East sometimes stops early.
 
 ### Motion Anomaly Detection
 
-R-I Ubuntu Alpha should detect and log:
+WT5 Ubuntu Alpha should detect and log:
 
 - Position changing when no command is active.
 - Command active but position not changing.
@@ -119,7 +119,7 @@ remove power.
 
 ## East/West Diagnostic Requirements
 
-R-I Ubuntu Alpha must make East/West differences visible.
+WT5 Ubuntu Alpha must make East/West differences visible.
 
 At connect time, log per antenna:
 
@@ -241,9 +241,9 @@ Stop reasons should be explicit, for example:
 - Save scan CSV files under `scan/`.
 - Show scan graph with graticule and boresight line.
 - Fit Gaussian plus sloped baseline.
-- Plot and fit azimuth scans in cross-elevation
-  (`AZ offset * cos(boresight elevation)`), deriving boresight elevation from
-  the nominal tracked-source elevation recorded for each scan point.
+- Plot and fit scan calibration data using clearly labelled axis coordinates.
+  The high-elevation azimuth/cross-elevation convention needs further review
+  before implementation.
 - Report peak centre, FWHM, fitted peak, and residual.
 - Continue tracking the selected source while scanning, with only the selected
   antenna offset.
@@ -329,7 +329,7 @@ Stop reasons should be explicit, for example:
 
 ## GUI Requirements
 
-The R-I Ubuntu Alpha GUI should be more aesthetically pleasing while remaining practical and
+The WT5 Ubuntu Alpha GUI should be more aesthetically pleasing while remaining practical and
 field-friendly.
 
 Suggested design:
@@ -352,7 +352,7 @@ Suggested design:
 
 ## Logging Requirements
 
-R-I Ubuntu Alpha needs both event logging and measurement logging.
+WT5 Ubuntu Alpha needs both event logging and measurement logging.
 
 ### Event Log
 
@@ -384,7 +384,7 @@ R-I Ubuntu Alpha needs both event logging and measurement logging.
 
 ## Simulation And Testing Requirements
 
-R-I Ubuntu Alpha should include a simulation backend before hardware tests.
+WT5 Ubuntu Alpha should include a simulation backend before hardware tests.
 
 Simulation should support:
 
@@ -413,7 +413,7 @@ Unit tests should cover:
 
 ## Migration Plan
 
-1. Create R-I Ubuntu Alpha skeleton and this requirements document.
+1. Create WT5 Ubuntu Alpha skeleton and this requirements document.
 2. Build config and safety modules.
 3. Add unit tests for safety and azimuth pathing.
 4. Add serial protocol module based on WT4.
@@ -428,25 +428,25 @@ Unit tests should cover:
 13. Add scan calibration.
 14. Add Y factor.
 15. Polish GUI colours and layout.
-16. Field-test against WT4 behaviours before relying on R-I Ubuntu Alpha operationally.
+16. Field-test against WT4 behaviours before relying on WT5 Ubuntu Alpha operationally.
 
-## Non-Goals For Initial R-I Ubuntu Alpha
+## Non-Goals For Initial WT5 Ubuntu Alpha
 
 - Do not rewrite Arduino firmware initially.
 - Do not depend on internet access for ephemeris.
 - Do not assume physical limit switches exist.
-- Do not remove WT4 until R-I Ubuntu Alpha has proven field behaviour.
+- Do not remove WT4 until WT5 Ubuntu Alpha has proven field behaviour.
 
 ## Open Questions
 
-- Should R-I Ubuntu Alpha support both RTL-SDR and SDRplay in the first clean rebuild, or
-  defer SDRplay until R-I Ubuntu Alpha is stable?
+- Should WT5 Ubuntu Alpha support both RTL-SDR and SDRplay in the first clean rebuild, or
+  defer SDRplay until WT5 Ubuntu Alpha is stable?
 - Should Y factor cold-sky presets be persisted in the INI?
 - Should long-slew segmentation size be configurable globally or per antenna?
 - Should hysteresis compensation eventually be direction-dependent calibration
   tables rather than a single low-to-high parameter?
 - Should the event log be JSONL, CSV, or both?
-- Should R-I Ubuntu Alpha store measurement metadata in a small SQLite database later, while
+- Should WT5 Ubuntu Alpha store measurement metadata in a small SQLite database later, while
   still exporting CSV?
 
 

@@ -1,5 +1,5 @@
-﻿#!/usr/bin/env python3
-"""Astronomical position helpers for R-I Ubuntu Alpha."""
+#!/usr/bin/env python3
+"""Astronomical position helpers for WT5 Ubuntu Alpha."""
 
 from __future__ import annotations
 
