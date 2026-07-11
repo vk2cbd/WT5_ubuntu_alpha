@@ -2784,8 +2784,8 @@ class WT5UbuntuAlphaApp(tk.Tk):
             return
         self.event_log.debug(event_name, antenna=antenna_name, **payload)
 
-    def connect_sessions_parallel(self, pending: list[tuple[str, AntennaConfig]]) -> tuple[list[tuple[str, SafeAntenna]], list[str]]:
-        connected: list[tuple[str, SafeAntenna]] = []
+    def connect_sessions_parallel(self, pending: list[tuple[str, AntennaConfig]]) -> tuple[list[str], list[str]]:
+        connected: list[str] = []
         errors: list[str] = []
         lock = threading.Lock()
 
@@ -2795,15 +2795,18 @@ class WT5UbuntuAlphaApp(tk.Tk):
                 try:
                     session = self.connect_session(config)
                     with lock:
-                        connected.append((name, session))
+                        connected.append(name)
+                    self.events.put(("ok", self.finish_connect_one_success, (name, session)))
                     return
                 except Exception as exc:
                     last_error = str(exc)
                     self.event_log.warn("CONNECT_ATTEMPT_FAIL", antenna=name, attempt=attempt, error=last_error)
                     if attempt < 3:
                         time.sleep(max(1.0, config.open_delay * 0.5))
+            error = f"{name}: {last_error}"
             with lock:
-                errors.append(f"{name}: {last_error}")
+                errors.append(error)
+            self.events.put(("ok", self.finish_connect_one_failure, error))
 
         threads = [threading.Thread(target=connect_one, args=(name, config), daemon=True) for name, config in pending]
         for thread in threads:
@@ -2812,43 +2815,42 @@ class WT5UbuntuAlphaApp(tk.Tk):
             thread.join()
         return connected, errors
 
-    def finish_connect_all(self, result: tuple[list[tuple[str, SafeAntenna]], list[str]]) -> None:
+    def finish_connect_one_success(self, result: tuple[str, SafeAntenna]) -> None:
+        name, session = result
+        self.attach_session(name, session, update_status=False)
+        self.event_log.info("CONNECT_OK", antenna=name)
+        self.last_user_activity = time.monotonic()
+        self.timeout_in_progress = False
+        connected = len(self.sessions)
+        total = len(self.configs)
+        self.status_var.set(f"Stopped. Connected {connected}/{total} antennas.")
+
+    def finish_connect_one_failure(self, error: str) -> None:
+        name = error.split(":", 1)[0]
+        self.event_log.error("CONNECT_FAIL", antenna=name, error=error)
+        panel = self.panels.get(name)
+        if panel:
+            panel.detach("DISCONNECTED", error)
+        connected = len(self.sessions)
+        total = len(self.configs)
+        self.status_var.set(f"Connected {connected}/{total}; connect fault: {error}")
+
+    def finish_connect_all(self, result: tuple[list[str], list[str]]) -> None:
         self.connecting_active = False
-        connected_sessions, errors = result
-        for name, session in connected_sessions:
-            self.attach_session(name, session, update_status=False)
-            self.event_log.info("CONNECT_OK", antenna=name)
-        if connected_sessions:
-            self.last_user_activity = time.monotonic()
-            self.timeout_in_progress = False
-            self.run_worker(
-                lambda names=[name for name, _session in connected_sessions]: self.refresh_connected_oled(names),
-                lambda _result: None,
-                self.set_status,
-            )
-        for error in errors:
-            name = error.split(":", 1)[0]
-            self.event_log.error("CONNECT_FAIL", antenna=name, error=error)
-            panel = self.panels.get(name)
-            if panel:
-                panel.detach("DISCONNECTED", error)
+        connected_names, errors = result
         connected = len(self.sessions)
         total = len(self.configs)
         if errors:
             self.status_var.set(f"Connected {connected}/{total}; connect fault: {'; '.join(errors)}")
-        else:
+        elif connected_names:
             self.status_var.set(f"Stopped. Connected {connected}/{total} antennas.")
+        else:
+            self.status_var.set("No antenna connections were attempted.")
 
     def finish_connect_fault(self, text: str) -> None:
         self.connecting_active = False
         self.event_log.error("CONNECT_FAULT", error=text)
         self.status_var.set(f"Connect fault: {text}")
-
-    def refresh_connected_oled(self, names: list[str]) -> None:
-        for name in names:
-            session = self.sessions.get(name)
-            if session:
-                session.update_oled("MANUAL", activity="STOPPED")
 
     def attach_session(self, name: str, session: SafeAntenna, update_status: bool = True) -> None:
         self.sessions[name] = session
