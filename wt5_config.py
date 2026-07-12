@@ -59,6 +59,7 @@ class ScanConfig:
     dwell_seconds: float = 1.0
     scan_count: int = 1
     antenna_name: str = ""
+    az_scan_high_to_low: bool = True
 
 
 @dataclass
@@ -221,6 +222,7 @@ def load_scan_config(path: Union[str, Path]) -> ScanConfig:
         dwell_seconds=parser.getfloat("scan", "dwell_seconds", fallback=1.0),
         scan_count=parser.getint("scan", "scan_count", fallback=1),
         antenna_name=parser.get("scan", "antenna_name", fallback="").strip(),
+        az_scan_high_to_low=parser.getboolean("scan", "az_scan_high_to_low", fallback=True),
     )
 
 
@@ -235,6 +237,7 @@ def save_scan_config(path: Union[str, Path], scan: ScanConfig) -> None:
         "dwell_seconds": f"{scan.dwell_seconds:.3f}",
         "scan_count": str(max(1, int(scan.scan_count))),
         "antenna_name": scan.antenna_name,
+        "az_scan_high_to_low": "yes" if scan.az_scan_high_to_low else "no",
     }
     with path.open("w", encoding="utf-8") as handle:
         parser.write(handle)

@@ -2163,6 +2163,7 @@ class ScanCalibrationDialog(tk.Toplevel):
         self.increment_var = tk.StringVar(value=f"{app.scan_config.increment_degrees:0.2f}")
         self.dwell_var = tk.StringVar(value=f"{app.scan_config.dwell_seconds:0.1f}")
         self.count_var = tk.StringVar(value=str(app.scan_config.scan_count))
+        self.az_high_to_low_var = tk.BooleanVar(value=app.scan_config.az_scan_high_to_low)
 
         body = ttk.Frame(self, padding=10)
         body.grid(row=0, column=0, sticky="nsew")
@@ -2174,8 +2175,13 @@ class ScanCalibrationDialog(tk.Toplevel):
         self._entry(body, "Increment deg", self.increment_var, 2)
         self._entry(body, "Dwell sec", self.dwell_var, 3)
         self._entry(body, "Scans", self.count_var, 4)
+        ttk.Checkbutton(
+            body,
+            text="AZ scan high to low",
+            variable=self.az_high_to_low_var,
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(6, 0))
         ttk.Label(body, textvariable=self.status_var, foreground="red", wraplength=360).grid(
-            row=5, column=0, columnspan=3, sticky="ew", pady=(8, 0)
+            row=6, column=0, columnspan=3, sticky="ew", pady=(8, 0)
         )
 
         buttons = ttk.Frame(self, padding=(10, 0, 10, 10))
@@ -2198,6 +2204,7 @@ class ScanCalibrationDialog(tk.Toplevel):
                 dwell_seconds=float(self.dwell_var.get()),
                 scan_count=int(self.count_var.get()),
                 antenna_name=self.antenna_var.get().strip(),
+                az_scan_high_to_low=bool(self.az_high_to_low_var.get()),
             )
             self.app.validate_scan_config(config)
         except ValueError:
@@ -3112,6 +3119,11 @@ class WT5UbuntuAlphaApp(tk.Tk):
             "SCAN_START",
             antenna=config.antenna_name,
             axis=axis_label(axis),
+            direction=(
+                "high_to_low"
+                if axis != Axis.AZIMUTH or config.az_scan_high_to_low
+                else "low_to_high"
+            ),
             span=config.span_degrees,
             increment=config.increment_degrees,
             dwell=config.dwell_seconds,
@@ -3132,7 +3144,7 @@ class WT5UbuntuAlphaApp(tk.Tk):
         if self.scan_dialog and self.scan_dialog.winfo_exists():
             self.scan_dialog.set_status("Scan stopping; returning to nominal target.")
 
-    def scan_offsets(self, config: ScanConfig) -> list[float]:
+    def scan_offsets(self, axis: Axis, config: ScanConfig) -> list[float]:
         offsets: list[float] = []
         value = config.span_degrees
         limit = -config.span_degrees - config.increment_degrees * 0.5
@@ -3141,6 +3153,8 @@ class WT5UbuntuAlphaApp(tk.Tk):
             value -= config.increment_degrees
         if offsets and offsets[-1] < -config.span_degrees:
             offsets[-1] = -config.span_degrees
+        if axis == Axis.AZIMUTH and not config.az_scan_high_to_low:
+            offsets.reverse()
         return offsets
 
     def scan_worker(self, axis: Axis, config: ScanConfig, dialog: ScanCalibrationDialog) -> None:
@@ -3150,7 +3164,7 @@ class WT5UbuntuAlphaApp(tk.Tk):
         scan_dir.mkdir(parents=True, exist_ok=True)
         csv_path = scan_dir / f"wt5_scan_{config.antenna_name.lower()}_{axis_label(axis).lower()}_{datetime.now():%Y%m%d-%H%M%S}.csv"
         try:
-            offsets = self.scan_offsets(config)
+            offsets = self.scan_offsets(axis, config)
             total_points = len(offsets) * config.scan_count
             point_index = 0
             for scan_number in range(1, config.scan_count + 1):
@@ -4211,6 +4225,15 @@ class WT5UbuntuAlphaApp(tk.Tk):
     ) -> TargetPosition:
         compensation = session.config.az_low_to_high_compensation
         if compensation == 0.0:
+            return target
+        if self.scan_active and antenna_name == self.scan_antenna_name and self.scan_axis == Axis.AZIMUTH:
+            self.event_log.debug(
+                "AZ_HYSTERESIS_COMP_DISABLED_FOR_SCAN",
+                antenna=antenna_name,
+                target=target.name,
+                nominal_az=target.azimuth,
+                compensation=compensation,
+            )
             return target
         try:
             current = session.last_position or session.read_position()

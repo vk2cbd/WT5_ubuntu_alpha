@@ -41,6 +41,7 @@ increment_degrees = 0.500
 dwell_seconds = 1.000
 scan_count = 1
 antenna_name = East
+az_scan_high_to_low = yes
 
 [yfactor]
 antenna_name = East
