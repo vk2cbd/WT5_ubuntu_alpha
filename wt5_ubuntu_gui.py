@@ -3888,14 +3888,14 @@ class WT5UbuntuAlphaApp(tk.Tk):
             raise RuntimeError(f"Selected source {self.site.selected_source!r} was not found.")
         return source
 
-    def current_tracking_target(self, kind: str) -> TargetPosition:
-        source = self.target_for_kind(kind)
+    def current_tracking_target(self, kind: str, when: Optional[datetime] = None) -> TargetPosition:
+        source = self.target_for_kind(kind, when)
         az_tolerance = self.site.az_track_tolerance_degrees
         el_tolerance = self.site.el_track_tolerance_degrees
         if az_tolerance >= 0 and el_tolerance >= 0:
             return source
 
-        now = datetime.now(timezone.utc)
+        now = when or datetime.now(timezone.utc)
         future = self.target_for_kind(kind, now + timedelta(seconds=60))
         az_delta = shortest_angle_delta(source.azimuth, future.azimuth)
         el_delta = future.elevation - source.elevation
@@ -3911,6 +3911,22 @@ class WT5UbuntuAlphaApp(tk.Tk):
             elevation=elevation,
         )
         return target
+
+    def tracking_target_is_low_to_high(
+        self,
+        kind: str,
+        antenna_name: str,
+        session: SafeAntenna,
+        target: TargetPosition,
+    ) -> bool:
+        now = datetime.now(timezone.utc)
+        future = self.current_tracking_target(kind, now + timedelta(seconds=60))
+        future = self.apply_scan_offset(future, antenna_name)
+        try:
+            az_delta = session.config.limits.azimuth_delta_to_target(target.azimuth, future.azimuth)
+        except Exception:
+            az_delta = shortest_angle_delta(target.azimuth, future.azimuth)
+        return az_delta > 0.001
 
     def apply_scan_offset(self, target: TargetPosition, antenna_name: str) -> TargetPosition:
         with self.scan_offset_lock:
@@ -4066,7 +4082,17 @@ class WT5UbuntuAlphaApp(tk.Tk):
         def make_worker(name: str, session: SafeAntenna, panel: AntennaPanel):
             activity = self.oled_activity_for_antenna(name, "SLEWING" if show_slewing else "TRACKING")
             effective_target = self.apply_scan_offset(target, name)
-            effective_target = self.apply_az_low_to_high_compensation(name, session, effective_target)
+            force_live_low_to_high = (
+                bool(self.tracking_kind)
+                and not show_slewing
+                and self.tracking_target_is_low_to_high(self.tracking_kind, name, session, effective_target)
+            )
+            effective_target = self.apply_az_low_to_high_compensation(
+                name,
+                session,
+                effective_target,
+                force_low_to_high=force_live_low_to_high,
+            )
             current_effective_target = {"target": effective_target}
 
             def progress(position: Position) -> None:
@@ -4079,7 +4105,16 @@ class WT5UbuntuAlphaApp(tk.Tk):
                     return effective_target.azimuth, effective_target.elevation
                 live_target = self.current_tracking_target(self.tracking_kind)
                 live_target = self.apply_scan_offset(live_target, name)
-                live_target = self.apply_az_low_to_high_compensation(name, session, live_target)
+                force_live_low_to_high = (
+                    not show_slewing
+                    and self.tracking_target_is_low_to_high(self.tracking_kind, name, session, live_target)
+                )
+                live_target = self.apply_az_low_to_high_compensation(
+                    name,
+                    session,
+                    live_target,
+                    force_low_to_high=force_live_low_to_high,
+                )
                 current_effective_target["target"] = live_target
                 return live_target.azimuth, live_target.elevation
 
@@ -4222,6 +4257,7 @@ class WT5UbuntuAlphaApp(tk.Tk):
         antenna_name: str,
         session: SafeAntenna,
         target: TargetPosition,
+        force_low_to_high: bool = False,
     ) -> TargetPosition:
         compensation = session.config.az_low_to_high_compensation
         if compensation == 0.0:
@@ -4246,7 +4282,7 @@ class WT5UbuntuAlphaApp(tk.Tk):
                 error=str(exc),
             )
             return target
-        if az_delta <= self.az_tracking_start_tolerance():
+        if not force_low_to_high and az_delta <= self.az_tracking_start_tolerance():
             return target
         adjusted_az = (target.azimuth + compensation) % 360.0
         adjusted = TargetPosition(target.name, adjusted_az, target.elevation)
@@ -4259,6 +4295,7 @@ class WT5UbuntuAlphaApp(tk.Tk):
             effective_az=adjusted_az,
             az_delta=az_delta,
             compensation=compensation,
+            force_low_to_high=force_low_to_high,
         )
         return adjusted
 
